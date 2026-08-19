@@ -1,0 +1,126 @@
+// ImtihonAI — Database Schema
+// SQLite ishlatilmoqda — o'rnatishda alohida database serverga ehtiyoj
+// bo'lmasligi uchun (fayl asosida ishlaydi: prisma/dev.db).
+// Productionga chiqarganda provider = "postgresql" ga o'zgartirish tavsiya etiladi.
+//
+// Eslatma: SQLite Prisma enum'larni qo'llab-quvvatlamaydi, shuning uchun
+// Level/Difficulty/ExamType oddiy String sifatida saqlanadi
+// (ruxsat etilgan qiymatlar TypeScript tomonida types/test.types.ts da cheklangan).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  password     String
+  class        Int?
+  goalScore    Int?
+  examDate     DateTime?
+  currentLevel String    @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
+  dailyMinutes Int?
+  onboarded    Boolean   @default(false)
+
+  subscriptionPlan   String    @default("FREE")
+  subscriptionExpire DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tests   Test[]
+  results Result[]
+  aiChats AiChat[]
+
+  @@map("users")
+}
+
+model Subject {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  slug   String  @unique
+  topics Topic[]
+  tests  Test[]
+
+  @@map("subjects")
+}
+
+model Topic {
+  id        String     @id @default(cuid())
+  name      String
+  subjectId String
+  subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@unique([subjectId, name])
+  @@map("topics")
+}
+
+model Test {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject  @relation(fields: [subjectId], references: [id])
+  topic      String?
+  difficulty String   @default("MEDIUM")
+  examType   String   @default("PRACTICE")
+  createdAt  DateTime @default(now())
+
+  questions Question[]
+  result    Result?
+
+  @@map("tests")
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  testId        String
+  test          Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  topicId       String?
+  topic         Topic?   @relation(fields: [topicId], references: [id])
+  questionText  String
+  options       String  // JSON.stringify(string[]) — SQLite Json tipini qo'llab-quvvatlamaydi
+  correctAnswer String
+  explanation   String
+  difficulty    String   @default("MEDIUM")
+  order         Int      @default(0)
+  userAnswer    String?
+  isCorrect     Boolean?
+
+  @@map("questions")
+}
+
+model Result {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  testId         String   @unique
+  test           Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  score          Int
+  correctAnswers Int
+  wrongAnswers   Int
+  weakTopics     String   // JSON.stringify(string[])
+  strongTopics   String   // JSON.stringify(string[])
+  aiAnalysis     String?
+  createdAt      DateTime @default(now())
+
+  @@map("results")
+}
+
+model AiChat {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  response  String
+  createdAt DateTime @default(now())
+
+  @@map("ai_chats")
+}
